@@ -1,0 +1,32 @@
+FROM adoptopenjdk/openjdk11:jdk-11.0.12_7-ubuntu-slim
+ARG PROVIDER=bigquery
+ARG CLOUDBEAVER_BRANCH=devel
+
+RUN apt-get update --fix-missing && apt-get -qq -y install gnupg2
+
+RUN /bin/bash -c ' curl -sL https://dl.yarnpkg.com/debian/pubkey.gpg | apt-key add - && \
+  echo "deb https://dl.yarnpkg.com/debian/ stable main" | tee /etc/apt/sources.list.d/yarn.list && \
+  curl -sL https://deb.nodesource.com/setup_14.x | bash -'
+
+RUN apt-get update --fix-missing && apt-get -qq -y install \
+    unzip \
+    git \
+    wget \
+    maven \
+    yarn \
+    nodejs
+
+RUN git clone https://github.com/dbeaver/cloudbeaver.git /tmp/cloudbeaver && \
+    cd /tmp/cloudbeaver && git checkout ${CLOUDBEAVER_BRANCH}
+
+# Add BigQuery drivers
+RUN mkdir -p /tmp/cloudbeaver/server/drivers/bigquery/src/main/resources && \
+    wget https://storage.googleapis.com/simba-bq-release/jdbc/SimbaJDBCDriverforGoogleBigQuery42_1.2.16.1020.zip \
+    -P /tmp/cloudbeaver/server/drivers/bigquery/src/main/resources
+ADD resources/cloudbeaver/plugin.xml /tmp/cloudbeaver/server/bundles/io.cloudbeaver.resources.drivers.base/plugin.xml
+ADD resources/cloudbeaver/drivers/pom.xml /tmp/cloudbeaver/server/drivers/pom.xml
+ADD resources/cloudbeaver/drivers/bigquery/pom.xml /tmp/cloudbeaver/server/drivers/bigquery/pom.xml
+
+RUN npm install -g lerna
+
+RUN cd /tmp/cloudbeaver/deploy && ./build.sh

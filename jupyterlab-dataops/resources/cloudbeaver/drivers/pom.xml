@@ -11,8 +11,10 @@
     </properties>
 
     <modules>
+         <module>bigquery</module>
         <module>h2</module>
         <module>mysql</module>
+        <module>postgresql</module>
         <module>trino</module>
     </modules>
 
