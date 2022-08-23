@@ -1,4 +1,4 @@
-FROM dbeaver/cloudbeaver:22.0.5 AS builder-dbeaver
+ARG PROVIDER=default
 FROM gcr.io/deeplearning-platform-release/base-cpu:m88 as base
 
 ARG VSCODE_VERSION=4.5.1
@@ -23,10 +23,6 @@ RUN code-server --install-extension ms-python.python@${VSCODE_PYTHON} \
 COPY resources/vsc/settings.json /root/.local/share/code-server/Machine/
 COPY resources/vsc/.bashrc root/
 
-# dbeaver
-COPY --from=builder-dbeaver /opt/cloudbeaver/ /opt/cloudbeaver/
-COPY resources/cloudbeaver/conf /opt/cloudbeaver/conf
-
 # requirements
 COPY requirements/requirements.txt /opt/requirements/
 RUN pip install -r /opt/requirements/requirements.txt
@@ -40,6 +36,21 @@ COPY resources/jupyter/ /etc/jupyter/
 # Expose port for Vertex AI compatibility
 EXPOSE 8080
 
-FROM base as bigquery
+# use default cloudbeaver in non-bigquery target
+FROM base AS default-stage
+COPY --from=dbeaver/cloudbeaver:22.0.5 /opt/cloudbeaver/ /opt/cloudbeaver/
+COPY resources/cloudbeaver/conf /opt/cloudbeaver/conf
+
+FROM base as bigquery-stage
 COPY requirements/requirements-bigquery.txt /opt/requirements/
 RUN pip install -r /opt/requirements/requirements-bigquery.txt
+COPY --from=gcr.io/getindata-images-public/dataops-cloudbeaver:latest /opt/cloudbeaver/ /opt/cloudbeaver/
+COPY resources/cloudbeaver/conf /opt/cloudbeaver/conf
+ADD resources/cloudbeaver/conf/initial-data-sources-bigquery.conf /opt/cloudbeaver/conf/initial-data-sources.conf
+COPY resources/cloudbeaver/set_metadata.py /opt/cloudbeaver/set_metadata.py
+COPY resources/cloudbeaver/set_metadata_run_jupyter.sh /set_metadata_run_jupyter.sh
+RUN chmod +x /set_metadata_run_jupyter.sh
+CMD ["/set_metadata_run_jupyter.sh"]
+
+FROM ${PROVIDER}-stage as final
+RUN echo ${PROVIDER}

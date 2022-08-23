@@ -1,0 +1,59 @@
+name: Build & Publish DataOps CloudBeaver Image
+
+on:
+  push:
+    tags:
+      - 'dataops-cloudbeaver-*.*.*'
+
+jobs:
+  buildx-dataops:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - uses: docker/setup-buildx-action@v1
+        id: buildx-cloudbeaver
+        with:
+          install: true
+
+      - name: Extract tag
+        id: tag-info
+        run: |
+          TAG_NAME=${GITHUB_REF#refs/*/}
+          IMAGE_NAME=`echo $TAG_NAME | sed -e's/\(.*\)-\([[:digit:]]\+\.[[:digit:]]\+\.[[:digit:]]\)\+/\1/'`
+          IMAGE_VERSION=`echo $TAG_NAME | sed -e's/\(.*\)-\([[:digit:]]\+\.[[:digit:]]\+\.[[:digit:]]\)\+/\2/'`
+          echo "::set-output name=IMAGE_NAME::$IMAGE_NAME"
+          echo "::set-output name=IMAGE_VERSION::$IMAGE_VERSION"
+
+      - name: Cache Docker layers
+        uses: actions/cache@v2
+        with:
+          path: /tmp/.buildx-cb-cache
+          key: ${{ runner.os }}-buildx-cb-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-cb
+
+      - name: Login to GCR
+        uses: docker/login-action@v1
+        with:
+          registry: gcr.io
+          username: _json_key
+          password: ${{ secrets.PUBLIC_GCR_DEPLOY_SA_KEY }}
+
+      - name: Build ${{ steps.tag-info.outputs.IMAGE_NAME }}
+        uses: docker/build-push-action@v2
+        with:
+          context: ${{ steps.tag-info.outputs.IMAGE_NAME }}
+          builder: ${{ steps.buildx.outputs.name }}
+          target: ${{ matrix.provider }}
+          file: ./Dockerfile-cloudbeaver
+          push: true
+          tags: gcr.io/getindata-images-public/${{ steps.tag-info.outputs.IMAGE_NAME }}:${{ steps.tag-info.outputs.IMAGE_VERSION }},gcr.io/getindata-images-public/${{ steps.tag-info.outputs.IMAGE_NAME }}:latest
+          cache-from: type=local,src=/tmp/.buildx-cb-cache
+          cache-to: type=local,dest=/tmp/.buildx-cb-cache-new
+
+      - name: Move cache
+        run: |
+          rm -rf /tmp/.buildx-cb-cache
+          mv /tmp/.buildx-cb-cache-new /tmp/.buildx-cb-cache

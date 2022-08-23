@@ -16,17 +16,20 @@ RUN apt-get update --fix-missing && apt-get -qq -y install \
     yarn \
     nodejs
 
-RUN git clone https://github.com/dbeaver/cloudbeaver.git /tmp/cloudbeaver && \
-    cd /tmp/cloudbeaver && git checkout ${CLOUDBEAVER_BRANCH}
+RUN git clone https://github.com/dbeaver/cloudbeaver.git /opt/cloudbeaver && \
+    cd /opt/cloudbeaver && git checkout ${CLOUDBEAVER_BRANCH}
 
 # Add BigQuery drivers
-RUN mkdir -p /tmp/cloudbeaver/server/drivers/bigquery/src/main/resources && \
+RUN mkdir -p /opt/cloudbeaver/server/drivers/bigquery/src/main/resources && \
     wget https://storage.googleapis.com/simba-bq-release/jdbc/SimbaJDBCDriverforGoogleBigQuery42_1.2.16.1020.zip \
-    -P /tmp/cloudbeaver/server/drivers/bigquery/src/main/resources
-ADD resources/cloudbeaver/plugin.xml /tmp/cloudbeaver/server/bundles/io.cloudbeaver.resources.drivers.base/plugin.xml
-ADD resources/cloudbeaver/drivers/pom.xml /tmp/cloudbeaver/server/drivers/pom.xml
-ADD resources/cloudbeaver/drivers/bigquery/pom.xml /tmp/cloudbeaver/server/drivers/bigquery/pom.xml
+    -P /opt/cloudbeaver/server/drivers/bigquery/src/main/resources
+ADD resources/cloudbeaver/plugin.xml /opt/cloudbeaver/server/bundles/io.cloudbeaver.resources.drivers.base/plugin.xml
+ADD resources/cloudbeaver/drivers/pom.xml /opt/cloudbeaver/server/drivers/pom.xml
+ADD resources/cloudbeaver/drivers/bigquery/pom.xml /opt/cloudbeaver/server/drivers/bigquery/pom.xml
 
 RUN npm install -g lerna
 
-RUN cd /tmp/cloudbeaver/deploy && ./build.sh
+RUN cd /opt/cloudbeaver/deploy && ./build.sh
+
+RUN mv /opt/cloudbeaver/deploy/cloudbeaver /tmp/cloudbeaver && \
+    rm -rf /opt/cloudbeaver && mv /tmp/cloudbeaver /opt/cloudbeaver
